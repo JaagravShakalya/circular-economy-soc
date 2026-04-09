@@ -156,3 +156,43 @@ def figure4_finite_size_scaling(
     plt.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {save_path}")
+
+
+def figure5_dynamic_vs_static_keystones(
+    pkl_path="data/keystones.pkl",
+    save_path="figures/fig5_dynamic_vs_static_keystones.png",
+):
+    """Scatter plots of dynamic keystone score vs three static centralities."""
+    import pickle
+    from scipy.stats import spearmanr
+
+    with open(pkl_path, "rb") as f:
+        data = pickle.load(f)
+
+    dynamic = data["dynamic"]
+    statics = data["statics"]
+    nodes = sorted(dynamic.keys())
+
+    dyn_arr = np.array([dynamic[n] for n in nodes])
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
+    static_names = [
+        ("in_degree", "In-degree"),
+        ("betweenness", "Betweenness centrality"),
+        ("pagerank", "PageRank"),
+    ]
+
+    for ax, (key, label) in zip(axes, static_names):
+        stat_arr = np.array([statics[key][n] for n in nodes])
+        rho, p = spearmanr(stat_arr, dyn_arr)
+        ax.scatter(stat_arr, dyn_arr, alpha=0.6, s=30, color="#4a90d9", edgecolor="black", linewidth=0.4)
+        ax.set_xlabel(label, fontsize=11)
+        ax.set_ylabel("Dynamic keystone score" if ax is axes[0] else "")
+        ax.set_title(f"{label}\nSpearman ρ = {rho:.3f}, p = {p:.2e}", fontsize=11)
+        ax.grid(True, alpha=0.3)
+
+    plt.suptitle("Dynamic keystone score vs static centrality measures", y=1.02, fontsize=13)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {save_path}")
