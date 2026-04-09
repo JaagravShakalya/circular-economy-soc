@@ -118,3 +118,41 @@ def figure3_subcritical_to_supercritical(
     plt.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {save_path}")
+
+
+def figure4_finite_size_scaling(
+    topology="barabasi_albert", mean_degree=4, seed=42,
+    sizes=(50, 100, 200, 400),
+    save_path="figures/fig4_finite_size_scaling.png",
+):
+    """Show how the avalanche distribution scales with system size N."""
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+
+    cmap = plt.cm.viridis
+    colors = [cmap(i / (len(sizes) - 1)) for i in range(len(sizes))]
+
+    for N_size, color in zip(sizes, colors):
+        path = f"data/runs/{topology}_k{mean_degree}_N{N_size}_seed{seed}.npy"
+        sizes_arr = np.load(path)
+        nonzero = sizes_arr[sizes_arr > 0]
+        if len(nonzero) == 0:
+            continue
+        centers, pdf = log_binned_pdf(nonzero)
+        ax.loglog(
+            centers, pdf, "o-", markersize=6,
+            color=color,
+            label=f"N = {N_size}",
+        )
+
+    ax.set_xlabel("Avalanche size $s$", fontsize=12)
+    ax.set_ylabel("$P(s)$", fontsize=12)
+    ax.set_title(
+        f"Finite-size scaling ({TOPOLOGY_LABELS[topology]}, "
+        f"$\\langle k \\rangle$ = {mean_degree})"
+    )
+    ax.legend(fontsize=11, title="System size")
+    ax.grid(True, which="both", alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {save_path}")

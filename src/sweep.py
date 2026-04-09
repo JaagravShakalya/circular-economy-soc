@@ -47,5 +47,26 @@ def main():
     print("Done.")
 
 
+def finite_size_sweep(topology="barabasi_albert", mean_degree=4, sizes=(50, 100, 200, 400), seed=42):
+    """Run the simulation at multiple system sizes for finite-size scaling."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    for N_size in sizes:
+        path = f"{DATA_DIR}/{topology}_k{mean_degree}_N{N_size}_seed{seed}.npy"
+        if os.path.exists(path):
+            print(f"Skipping {path} (exists)")
+            continue
+        print(f"Running N={N_size}...")
+        G = make_network(N=N_size, topology=topology, mean_degree=mean_degree, seed=seed)
+        G = assign_attributes(G, seed=seed)
+        avalanches = run_simulation(
+            G, T=T, sigma=0.0, mu=0.0,
+            burn_in=BURN_IN, seed=seed, alpha=ALPHA,
+        )
+        np.save(path, np.array(avalanches))
+        print(f"  saved {path}")
+
+
 if __name__ == "__main__":
     main()
+    print("\nFinite-size scaling sweep:")
+    finite_size_sweep()
