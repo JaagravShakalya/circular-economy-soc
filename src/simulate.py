@@ -45,24 +45,27 @@ def initialize_loads(G, alpha=0.3):
         G.nodes[n]["capacity"] = (1 + alpha) * load[n]
 
 
-def propagate_cascade(G, state, initial_trip):
+def propagate_cascade(G, state, initial_trip, return_rounds=False):
     """
     Cascade after one plant is tripped. Redistribute its load to downstream
     neighbors; any neighbor whose new load exceeds capacity also trips.
     Continues until no more trips.
+
+    If return_rounds is True, also return a dict {node: round_number}
+    indicating which propagation round each plant tripped in
+    (initial trip = round 0).
     """
     tripped = set([initial_trip])
+    rounds = {initial_trip: 0}
     current_load = dict(state["current_load"])
-    queue = [initial_trip]
+    queue = [(initial_trip, 0)]
 
     while queue:
-        node = queue.pop(0)
+        node, r = queue.pop(0)
         successors = list(G.successors(node))
         if not successors:
             continue
 
-        # Distribute this node's load to its successors,
-        # weighted by edge weight
         total_w = sum(G.edges[node, v].get("weight", 1.0) for v in successors)
         if total_w == 0:
             continue
@@ -76,9 +79,12 @@ def propagate_cascade(G, state, initial_trip):
             current_load[v] += extra
             if current_load[v] > G.nodes[v]["capacity"]:
                 tripped.add(v)
-                queue.append(v)
+                rounds[v] = r + 1
+                queue.append((v, r + 1))
 
     state["current_load"] = current_load
+    if return_rounds:
+        return tripped, rounds
     return tripped
 
 
