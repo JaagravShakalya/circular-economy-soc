@@ -133,26 +133,75 @@ def static_cascade_snapshot(
 
 def animated_cascade_gif(
     save_path="figures/cascade_animation.gif",
-    N=80, topology="barabasi_albert", mean_degree=4, seed=42,
-    target_size=15, fps=2,
+    N=120, topology="barabasi_albert", mean_degree=4, seed=42,
+    n_cascades=4, fps=1.5,
 ):
     """
-    Make an animated GIF of a cascade.
+    Make an animated GIF showing several different cascades back-to-back,
+    illustrating the variability in avalanche sizes (the SOC fingerprint).
     """
     G = make_network(N=N, topology=topology, mean_degree=mean_degree, seed=seed)
     G = assign_attributes(G, seed=seed)
     initialize_loads(G, alpha=ALPHA)
 
-    initial, tripped, rounds = find_interesting_cascade(G, target_size=target_size, seed=1)
-    max_round = max(rounds.values())
-    print(f"Cascade for animation: initial={initial}, size={len(tripped)}, rounds={max_round}")
-
     pos = nx.spring_layout(G, seed=42, k=1.6 / (N ** 0.5))
 
-    fig, ax = plt.subplots(figsize=(7, 7))
+    # Find n_cascades cascades of varied sizes
+    target_sizes = [3, 8, 20, 45]  # small, medium, large, very large
+    cascades = []  # list of (initial, tripped_set, rounds_dict)
 
-    # Add a few "hold" frames at start and end
-    n_frames = max_round + 4
+    for i, target in enumerate(target_sizes[:n_cascades]):
+        result = find_interesting_cascade(G, target_size=target, seed=10 + i)
+        if result is not None:
+            initial, tripped, rounds = result
+            cascades.append((initial, tripped, rounds))
+            print(f"Cascade {i+1}: initial={initial}, size={len(tripped)}, rounds={max(rounds.values())}")
+
+    # Build the frame schedule: hold-start, cascade rounds, hold-end, then next cascade
+    n_hold_start = 2
+    n_hold_end = 3
+    frame_schedule = []  # list of (cascade_idx, "type", round_num)
+
+    for ci, (initial, tripped, rounds) in enumerate(cascades):
+        max_round = max(rounds.values())
+        for _ in range(n_hold_start):
+            frame_schedule.append((ci, "start", 0))
+        for r in range(max_round + 1):
+            frame_schedule.append((ci, "round", r))
+        for _ in range(n_hold_end):
+            frame_schedule.append((ci, "end", max_round))
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    def animate(frame):
+        ax.clear()
+        ci, kind, r = frame_schedule[frame]
+        initial, tripped, rounds = cascades[ci]
+        max_round = max(rounds.values())
+
+        if kind == "start":
+            tripped_so_far = set()
+            current = set()
+            label = f"Cascade {ci+1}/{len(cascades)} — initial state"
+        elif kind == "end":
+            tripped_so_far = set(rounds.keys())
+            current = set()
+            label = f"Cascade {ci+1}/{len(cascades)} complete: {len(tripped)} of {N} plants tripped"
+        else:
+            tripped_so_far = {n for n, rr in rounds.items() if rr <= r}
+            current = {n for n, rr in rounds.items() if rr == r}
+            label = f"Cascade {ci+1}/{len(cascades)} — round {r}: {len(tripped_so_far)} tripped"
+
+        draw_cascade_state(G, pos, tripped_so_far, current, ax)
+        ax.set_title(label, fontsize=12)
+
+    anim = animation.FuncAnimation(
+        fig, animate, frames=len(frame_schedule),
+        interval=int(1000 / fps), repeat=True,
+    )
+    anim.save(save_path, writer="pillow", fps=fps, dpi=100)
+    plt.close(fig)
+    print(f"Saved {save_path} ({len(frame_schedule)} frames)")
 
     def animate(frame):
         ax.clear()
